@@ -10,7 +10,9 @@ import com.intellij.openapi.externalSystem.model.task.ExternalSystemTaskId
 import com.intellij.openapi.externalSystem.model.task.ExternalSystemTaskNotificationListener
 import com.intellij.openapi.externalSystem.model.task.ExternalSystemTaskNotificationListenerAdapter
 import com.intellij.openapi.externalSystem.model.task.ExternalSystemTaskType
+import com.intellij.openapi.externalSystem.service.execution.ExternalSystemJdkUtil
 import com.intellij.openapi.externalSystem.util.ExternalSystemApiUtil
+import com.intellij.openapi.projectRoots.JdkUtil
 import org.jetbrains.kotlin.idea.core.script.ScriptDefinitionContributor
 import org.jetbrains.kotlin.idea.framework.GRADLE_SYSTEM_ID
 import org.jetbrains.kotlin.idea.scripting.gradle.GradleScriptDefinitionsContributor
@@ -64,6 +66,13 @@ class KotlinDslSyncListener : ExternalSystemTaskNotificationListenerAdapter() {
                 .getExecutionSettings<GradleExecutionSettings>(project, sync.workingDir, GradleConstants.SYSTEM_ID)
                 .javaHome
         }
+
+        sync.javaHome = sync.javaHome?.takeIf { JdkUtil.checkForJdk(it) }
+            ?: run {
+                // roll back to specified in GRADLE_JVM if for some reason sync.javaHome points to corrupted SDK
+                val gradleJvm = GradleSettings.getInstance(project).getLinkedProjectSettings(sync.workingDir)?.gradleJvm
+                ExternalSystemJdkUtil.getJdk(project, gradleJvm)?.homePath
+            }
 
         GradleSettings.getInstance(project).getLinkedProjectSettings(sync.workingDir)?.validateGradleSdk(project, sync.javaHome)
 
